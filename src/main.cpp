@@ -60,7 +60,7 @@ void setup()
   setupWiFi();
   blinker.attach(blink_ok, blink);
 
-  tr064.woke();
+  tr064.getSecurityPort();
 
   // if (tr064.init())
   // {

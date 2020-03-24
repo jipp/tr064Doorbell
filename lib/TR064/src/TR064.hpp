@@ -21,7 +21,8 @@ public:
     TR064(std::string host, uint16_t port, std::string username, std::string password);
     boolean init();
     boolean getPage(std::string &str, const std::string url);
-    void woke();
+    void getSecurityPort();
+    void getHostNumberOfEntries();
 
 private:
     std::string host = "fritz.box";

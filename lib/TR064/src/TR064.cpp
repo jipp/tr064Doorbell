@@ -82,7 +82,7 @@ std::string TR064::getParameter(std::string str, std::string value)
     }
 }
 
-void TR064::woke()
+void TR064::getSecurityPort()
 {
     HTTPClient httpClient;
     WiFiClient wifiClient;
@@ -95,6 +95,42 @@ void TR064::woke()
     xml += R"(<s:Body>)";
     xml += R"(<u:GetSecurityPort xmlns:u="urn:dslforumorg:service:DeviceInfo:1">)";
     xml += R"(</u:GetSecurityPort>)";
+    xml += R"(</s:Body>)";
+    xml += R"(</s:Envelope>\0)";
+
+    contentType = R"(text/xml; charset="utf-8")";
+    soapAction = R"(urn:dslforum-org:service:DeviceInfo:1#GetSecurityPort)";
+
+    httpClient.begin(wifiClient, "http://fritz.box:49000/upnp/control/deviceinfo");
+    httpClient.addHeader("Content-Type", contentType.c_str());
+    httpClient.addHeader("SoapAction", soapAction.c_str());
+
+    int httpCode = httpClient.POST(xml.c_str());
+    String payload = httpClient.getString();
+    httpClient.end();
+
+    Serial.println(httpCode);
+    Serial.println(payload);
+}
+
+void TR064::getHostNumberOfEntries()
+{
+    HTTPClient httpClient;
+    WiFiClient wifiClient;
+    std::string xml;
+    std::string contentType;
+    std::string soapAction;
+
+    xml = R"(<?xml version="1.0" encoding="utf-8"?>)";
+    xml += R"(<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">)";
+    xml += R"(<s:Header>)";
+    xml += R"(<h:InitChallenge xmlns:h="http://soap-authentication.org/digest/2001/10/" s:mustUnderstand="1">)";
+    xml += R"(<UserID>admin</UserID>)";
+    xml += R"(</h:InitChallenge>)";
+    xml += R"(</s:Header>)";
+    xml += R"(<s:Body>)";
+    xml += R"(<u:GetHostNumberOfEntries xmlns:u="urn:dslforum-org:service:Hosts:1">)";
+    xml += R"(</u:GetHostNumberOfEntries>)";
     xml += R"(</s:Body>)";
     xml += R"(</s:Envelope>\0)";
 
