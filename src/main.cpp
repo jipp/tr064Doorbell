@@ -1,6 +1,5 @@
 #include <Arduino.h>
 
-#include <iostream>
 #include <Ticker.h>
 #include <WiFiManager.h>
 
@@ -11,10 +10,10 @@
 #endif
 
 const char *hostname = "doorbell";
-const std::string host = "fritz.box";
+const char *host = "fritz.box";
 const uint16_t port = 49000;
-const std::string username = "doorbell";
-const std::string password = "Drei3Zehn";
+const char *username = "doorbell";
+const char *password = "Drei3Zehn";
 
 Ticker blinker;
 const float blink_ok = 0.5;
@@ -31,7 +30,6 @@ void setupWiFi()
 {
   WiFiManager wifiManager;
 
-  WiFi.mode(WIFI_OFF);
   WiFi.mode(WIFI_STA);
 
   wifiManager.setDebugOutput(true);
@@ -60,12 +58,20 @@ void setup()
   setupWiFi();
   blinker.attach(blink_ok, blink);
 
-  tr064.getSecurityPort();
+  Service service;
+  Action action;
 
-  // if (tr064.init())
-  // {
-  //   tr064.woke();
-  // }
+  service.serviceType = "urn:dslforum-org:service:DeviceInfo:1";
+  service.serviceId = "urn:DeviceInfo-com:serviceId:DeviceInfo:1";
+  service.controlURL = "/upnp/control/deviceinfo";
+  service.eventSubURL = "/upnp/control/time";
+  service.SCPDURL = "/deviceinfoSCPD.xml";
+
+  action.name = "GetSecurityPort";
+  action.argumentName = "NewSecurityPort";
+
+  Serial.print("NewSecurityPort: ");
+  Serial.println(tr064.getInfo(service, action));
 }
 
 void loop()

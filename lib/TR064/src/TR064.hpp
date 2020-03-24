@@ -4,33 +4,47 @@
 #include <Arduino.h>
 
 #if defined(ESP8266)
-    #include <ESP8266HTTPClient.h>
+#include <ESP8266HTTPClient.h>
 #elif defined(ESP32)
-    #include <HTTPClient.h>
+#include <HTTPClient.h>
 #endif
 
-#include <iostream>
-#include <sstream>
 #include <WiFiClient.h>
+
+struct Service
+{
+    String serviceType;
+    String serviceId;
+    String controlURL;
+    String eventSubURL;
+    String SCPDURL;
+};
+
+struct Action
+{
+    String name;
+    String argumentName;
+};
 
 class TR064
 {
 public:
-    std::string friendlyName;
-    std::string deviceType;
-    TR064(std::string host, uint16_t port, std::string username, std::string password);
+    String friendlyName;
+    String deviceType;
+    TR064(const char *host, uint16_t port, const char *username, const char *password);
     boolean init();
-    boolean getPage(std::string &str, const std::string url);
-    void getSecurityPort();
+    boolean getPage(String &str, const String &url);
+    String getInfo(Service &service, Action &action);
     void getHostNumberOfEntries();
 
 private:
-    std::string host = "fritz.box";
+    const char *host = "fritz.box";
     uint16_t port = 49000;
-    std::string username = "";
-    std::string password = "";
-    std::string tr64desc;
-    std::string getParameter(std::string str, std::string value);
+    const char *username = "";
+    const char *password = "";
+    String tr64desc;
+    Service service;
+    String getParameter(const String &str, const String value);
 };
 
 #endif

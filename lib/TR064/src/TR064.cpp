@@ -1,6 +1,6 @@
 #include "TR064.hpp"
 
-TR064::TR064(std::string host, uint16_t port, std::string username, std::string password)
+TR064::TR064(const char *host, uint16_t port, const char *username, const char *password)
 {
     this->host = host;
     this->port = port;
@@ -21,15 +21,14 @@ boolean TR064::init()
     return false;
 }
 
-boolean TR064::getPage(std::string &str, const std::string url)
+boolean TR064::getPage(String &str, const String &url)
 {
     HTTPClient httpClient;
     WiFiClient wifiClient;
+    String link;
     int httpCode;
-    std::stringstream ss;
 
-    ss << "http://" << host << ":" << port << "/" << url;
-    std::string link = ss.str();
+    link = "http://" + String(host) + ":" + port + "/" + url;
 
     if (httpClient.begin(wifiClient, link.c_str()))
     {
@@ -37,11 +36,9 @@ boolean TR064::getPage(std::string &str, const std::string url)
 
         if (httpCode > 0)
         {
-            std::cout << "httpCode: " << httpCode << std::endl;
-
             if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
             {
-                str = std::string(httpClient.getString().c_str());
+                str = httpClient.getString();
 
                 return true;
             }
@@ -61,90 +58,68 @@ boolean TR064::getPage(std::string &str, const std::string url)
     return false;
 }
 
-std::string TR064::getParameter(std::string str, std::string value)
+String TR064::getParameter(const String &str, const String value)
 {
     int16_t start;
     int16_t stop;
 
-    start = str.find("<" + value + ">");
-    stop = str.find("</" + value + ">");
+    start = str.indexOf("<" + value + ">");
+    stop = str.indexOf("</" + value + ">");
 
     if (start >= 0 && stop >= 0)
     {
         start += value.length() + 2;
-        stop -= start;
 
-        return str.substr(start, stop);
+        return str.substring(start, stop);
     }
-    else
+
+    return "";
+}
+
+String TR064::getInfo(Service &service, Action &action)
+{
+    // http://fritz.box:49000/tr64desc.xml
+
+    HTTPClient httpClient;
+    WiFiClient wifiClient;
+
+    String xml;
+    String url;
+    String soapAction;
+    int httpCode;
+    String payload;
+
+    xml = "<?xml version=\"1.0\"?>";
+    xml += "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">";
+    xml += "<s:Body>";
+    xml += "<u:" + action.name + " xmlns:u=\"" + service.serviceType + "\">";
+    xml += "</u:" + action.name + ">";
+    xml += "</s:Body>";
+    xml += "</s:Envelope>";
+
+    soapAction = service.serviceType + "#" + action.name;
+    url = "http://" + String(host) + ":" + 49000 + service.controlURL;
+
+    httpClient.begin(wifiClient, url);
+    
+    httpClient.addHeader("Content-Type", "text/xml; charset=\"utf-8\"");
+    httpClient.addHeader("SoapAction", soapAction);
+
+    httpCode = httpClient.POST(xml);
+    payload = httpClient.getString();
+    httpClient.end();
+
+    switch (httpCode)
     {
+    case HTTP_CODE_OK:
+        return getParameter(payload, action.argumentName);
+    case HTTP_CODE_UNAUTHORIZED:
+        Serial.println("401 Unauthorized");
+        return "";
+    case HTTP_CODE_INTERNAL_SERVER_ERROR:
+        Serial.println(getParameter(payload, "errorDescription"));
+        return "";
+    default:
         return "";
     }
-}
-
-void TR064::getSecurityPort()
-{
-    HTTPClient httpClient;
-    WiFiClient wifiClient;
-    std::string xml;
-    std::string contentType;
-    std::string soapAction;
-
-    xml = R"(<?xml version="1.0"?>)";
-    xml += R"(<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">)";
-    xml += R"(<s:Body>)";
-    xml += R"(<u:GetSecurityPort xmlns:u="urn:dslforumorg:service:DeviceInfo:1">)";
-    xml += R"(</u:GetSecurityPort>)";
-    xml += R"(</s:Body>)";
-    xml += R"(</s:Envelope>\0)";
-
-    contentType = R"(text/xml; charset="utf-8")";
-    soapAction = R"(urn:dslforum-org:service:DeviceInfo:1#GetSecurityPort)";
-
-    httpClient.begin(wifiClient, "http://fritz.box:49000/upnp/control/deviceinfo");
-    httpClient.addHeader("Content-Type", contentType.c_str());
-    httpClient.addHeader("SoapAction", soapAction.c_str());
-
-    int httpCode = httpClient.POST(xml.c_str());
-    String payload = httpClient.getString();
-    httpClient.end();
-
-    Serial.println(httpCode);
-    Serial.println(payload);
-}
-
-void TR064::getHostNumberOfEntries()
-{
-    HTTPClient httpClient;
-    WiFiClient wifiClient;
-    std::string xml;
-    std::string contentType;
-    std::string soapAction;
-
-    xml = R"(<?xml version="1.0" encoding="utf-8"?>)";
-    xml += R"(<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">)";
-    xml += R"(<s:Header>)";
-    xml += R"(<h:InitChallenge xmlns:h="http://soap-authentication.org/digest/2001/10/" s:mustUnderstand="1">)";
-    xml += R"(<UserID>admin</UserID>)";
-    xml += R"(</h:InitChallenge>)";
-    xml += R"(</s:Header>)";
-    xml += R"(<s:Body>)";
-    xml += R"(<u:GetHostNumberOfEntries xmlns:u="urn:dslforum-org:service:Hosts:1">)";
-    xml += R"(</u:GetHostNumberOfEntries>)";
-    xml += R"(</s:Body>)";
-    xml += R"(</s:Envelope>\0)";
-
-    contentType = R"(text/xml; charset="utf-8")";
-    soapAction = R"(urn:dslforum-org:service:DeviceInfo:1#GetSecurityPort)";
-
-    httpClient.begin(wifiClient, "http://fritz.box:49000/upnp/control/deviceinfo");
-    httpClient.addHeader("Content-Type", contentType.c_str());
-    httpClient.addHeader("SoapAction", soapAction.c_str());
-
-    int httpCode = httpClient.POST(xml.c_str());
-    String payload = httpClient.getString();
-    httpClient.end();
-
-    Serial.println(httpCode);
-    Serial.println(payload);
 }
