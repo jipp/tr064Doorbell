@@ -61,17 +61,31 @@ void setup()
   Service service;
   Action action;
 
-  service.serviceType = "urn:dslforum-org:service:DeviceInfo:1";
-  service.serviceId = "urn:DeviceInfo-com:serviceId:DeviceInfo:1";
-  service.controlURL = "/upnp/control/deviceinfo";
-  service.eventSubURL = "/upnp/control/time";
-  service.SCPDURL = "/deviceinfoSCPD.xml";
+  // service.serviceType = "urn:dslforum-org:service:DeviceInfo:1";
+  // service.serviceId = "urn:DeviceInfo-com:serviceId:DeviceInfo1";
+  // service.controlURL = "/upnp/control/deviceinfo";
+  // service.eventSubURL = "/upnp/control/deviceinfo";
+  // service.SCPDURL = "/deviceinfoSCPD.xml";
 
-  action.name = "GetSecurityPort";
-  action.argumentName = "NewSecurityPort";
+  // action.name = "GetSecurityPort";
+  // action.direction = "out";
+  // action.argumentName = "NewSecurityPort";
 
-  Serial.print("NewSecurityPort: ");
-  Serial.println(tr064.getInfo(service, action));
+  // Serial.print("NewSecurityPort: ");
+  // Serial.println(tr064.getInfo(service, action));
+
+  service.serviceType = "urn:dslforum-org:service:X_VoIP:1";
+  service.serviceId = "urn:X_VoIP-com:serviceId:X_VoIP1";
+  service.controlURL = "/upnp/control/x_voip";
+  service.eventSubURL = "/upnp/control/x_voip";
+  service.SCPDURL = "/x_voipSCPD.xml";
+
+  action.name = "X_AVM-DE_DialNumber";
+  action.direction = "in";
+  action.argumentName = "NewX_AVM-DE_PhoneNumber";
+  action.variable = "01735430716";
+
+  tr064.authenticate(service, action);
 }
 
 void loop()

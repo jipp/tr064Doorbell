@@ -23,7 +23,9 @@ struct Service
 struct Action
 {
     String name;
+    String direction;
     String argumentName;
+    String variable = "";
 };
 
 class TR064
@@ -35,6 +37,7 @@ public:
     boolean init();
     boolean getPage(String &str, const String &url);
     String getInfo(Service &service, Action &action);
+    String authenticate(Service &service, Action &action);
     void getHostNumberOfEntries();
 
 private:

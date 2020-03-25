@@ -89,21 +89,29 @@ String TR064::getInfo(Service &service, Action &action)
     int httpCode;
     String payload;
 
-    xml = "<?xml version=\"1.0\"?>";
-    xml += "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">";
-    xml += "<s:Body>";
-    xml += "<u:" + action.name + " xmlns:u=\"" + service.serviceType + "\">";
-    xml += "</u:" + action.name + ">";
-    xml += "</s:Body>";
-    xml += "</s:Envelope>";
+    xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+    xml += "<s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">\n";
+    xml += "<s:Body>\n";
+    xml += "<u:" + action.name + " xmlns:u=\"" + service.serviceType + "\">\n";
+    if (action.direction == "in")
+    {
+        xml += "<" + action.argumentName + ">" + action.variable + "</" + action.argumentName + ">\n";
+    }
+    xml += "</u:" + action.name + ">\n";
+    xml += "</s:Body>\n";
+    xml += "</s:Envelope>\n";
 
     soapAction = service.serviceType + "#" + action.name;
     url = "http://" + String(host) + ":" + 49000 + service.controlURL;
 
     httpClient.begin(wifiClient, url);
-    
+
     httpClient.addHeader("Content-Type", "text/xml; charset=\"utf-8\"");
     httpClient.addHeader("SoapAction", soapAction);
+
+    Serial.print("SoapAction: ");
+    Serial.println(soapAction);
+    Serial.println(xml);
 
     httpCode = httpClient.POST(xml);
     payload = httpClient.getString();
@@ -112,9 +120,89 @@ String TR064::getInfo(Service &service, Action &action)
     switch (httpCode)
     {
     case HTTP_CODE_OK:
-        return getParameter(payload, action.argumentName);
+        if (action.direction == "out")
+        {
+            return getParameter(payload, action.argumentName);
+        }
+        else
+        {
+            return "";
+        }
     case HTTP_CODE_UNAUTHORIZED:
         Serial.println("401 Unauthorized");
+        Serial.println(payload);
+        // authenticate(service, action);
+        return "";
+    case HTTP_CODE_INTERNAL_SERVER_ERROR:
+        Serial.println(getParameter(payload, "errorDescription"));
+        return "";
+    default:
+        return "";
+    }
+}
+
+String TR064::authenticate(Service &service, Action &action)
+{
+    // http://fritz.box:49000/tr64desc.xml
+
+    HTTPClient httpClient;
+    WiFiClient wifiClient;
+
+    String xml;
+    String url;
+    String soapAction;
+    int httpCode;
+    String payload;
+
+    xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+    xml += "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n";
+    xml += "<s:Header>\n";
+    xml += "<h:InitChallenge xmlns:h=\"http://soap-authentication.org/digest/2001/10/\" s:mustUnderstand=\"1\">\n";
+    xml += "<UserID>" + String(username) + "</UserID>\n";
+    xml += "</h:InitChallenge>\n";
+    xml += "</s:Header>\n";
+    xml += "<s:Body>\n";
+    xml += "<u:" + action.name + " xmlns:u=\"" + service.serviceType + "\">\n";
+    if (action.direction == "in")
+    {
+        xml += "<" + action.argumentName + ">" + action.variable + "</" + action.argumentName + ">\n";
+    }
+    xml += "</u:" + action.name + ">\n";
+    xml += "</s:Body>\n";
+    xml += "</s:Envelope>\n";
+
+    soapAction = service.serviceType + "#" + action.name;
+    url = "http://" + String(host) + ":" + 49000 + service.controlURL;
+
+    httpClient.begin(wifiClient, url);
+
+    httpClient.addHeader("Content-Type", "text/xml; charset=\"utf-8\"");
+    httpClient.addHeader("SoapAction", soapAction);
+
+    Serial.print("url: ");
+    Serial.println(url);
+    Serial.print("SoapAction: ");
+    Serial.println(soapAction);
+    Serial.println(xml);
+
+    httpCode = httpClient.POST(xml);
+    payload = httpClient.getString();
+    httpClient.end();
+
+    switch (httpCode)
+    {
+    case HTTP_CODE_OK:
+        if (action.direction == "out")
+        {
+            return getParameter(payload, action.argumentName);
+        }
+        else
+        {
+            return "";
+        }
+    case HTTP_CODE_UNAUTHORIZED:
+        Serial.println("401 Unauthorized");
+        Serial.println(payload);
         return "";
     case HTTP_CODE_INTERNAL_SERVER_ERROR:
         Serial.println(getParameter(payload, "errorDescription"));
