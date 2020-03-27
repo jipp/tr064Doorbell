@@ -10,8 +10,8 @@
 #endif
 
 const char *hostname = "doorbell";
-const char *host = "fritz.box";
-const uint16_t port = 49000;
+const char *host = "192.168.178.1";
+const uint16_t port = 49443;
 const char *username = "doorbell";
 const char *password = "Drei3Zehn";
 
@@ -86,7 +86,7 @@ void setup()
   action.variable = "01735430716";
 
   tr064.authenticate(service, action);
-}
+  }
 
 void loop()
 {

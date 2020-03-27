@@ -10,6 +10,7 @@
 #endif
 
 #include <WiFiClient.h>
+#include <MD5Builder.h>
 
 struct Service
 {
@@ -48,6 +49,9 @@ private:
     String tr64desc;
     Service service;
     String getParameter(const String &str, const String value);
+    String getDigestAuth(String &authReq, const String &username, const String &password, const String &uri, unsigned int counter);
+    String exractParam(String &authReq, const String &param, const char delimit);
+    String getCNonce(const int len);
 };
 
 #endif
