@@ -16,7 +16,7 @@ boolean TR064::init()
         deviceType = getParameter(tr64desc, "deviceType");
 
         return true;
-    };
+    }
 
     return false;
 }
@@ -245,7 +245,7 @@ String TR064::getDigestAuth(String &authReq, const String &username, const Strin
     // extracting required parameters for RFC 2069 simpler Digest
     String realm = exractParam(authReq, "realm=\"", '"');
     String nonce = exractParam(authReq, "nonce=\"", '"');
-    String cNonce = getCNonce(32);
+    String cNonce = getCNonce(44);
 
     char nc[9];
     snprintf(nc, sizeof(nc), "%08x", counter);
@@ -268,7 +268,7 @@ String TR064::getDigestAuth(String &authReq, const String &username, const Strin
     String response = md5.toString();
 
     String authorization = "Digest username=\"" + username + "\", realm=\"" + realm + "\", nonce=\"" + nonce +
-                           "\", uri=\"" + uri + "\", algorithm=\"MD5\", qop=auth, nc=" + String(nc) + ", cnonce=\"" + cNonce + "\", response=\"" + response + "\"";
+                           "\", uri=\"" + uri + "\", cnonce=\"" + cNonce + "\", nc=" + String(nc) + ", qop=auth, response=\"" + response + "\", algorithm=\"MD5\"";
     Serial.println(authorization);
 
     return authorization;
@@ -276,12 +276,12 @@ String TR064::getDigestAuth(String &authReq, const String &username, const Strin
 
 String TR064::exractParam(String &authReq, const String &param, const char delimit)
 {
-    int _begin = authReq.indexOf(param);
-    if (_begin == -1)
+    int start = authReq.indexOf(param);
+    if (start == -1)
     {
         return "";
     }
-    return authReq.substring(_begin + param.length(), authReq.indexOf(delimit, _begin + param.length()));
+    return authReq.substring(start + param.length(), authReq.indexOf(delimit, start + param.length()));
 }
 
 String TR064::getCNonce(const int len)
