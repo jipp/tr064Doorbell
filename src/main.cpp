@@ -1,6 +1,13 @@
 #include <Arduino.h>
 
 #include <Ticker.h>
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#elif defined(ESP32)
+#include <WiFi.h>
+#include <HTTPClient.h>
+#endif
 #include <WiFiManager.h>
 
 #include "TR064.hpp"
@@ -10,8 +17,8 @@
 #endif
 
 const char *hostname = "doorbell";
-const char *host = "192.168.178.1";
-const uint16_t port = 49443;
+const char *host = "fritz.box";
+const uint16_t port = 49000;
 const char *username = "doorbell";
 const char *password = "Drei3Zehn";
 
@@ -20,6 +27,8 @@ const float blink_ok = 0.5;
 const float blink_nok = 0.1;
 
 TR064 tr064(host, port, username, password);
+Service service;
+Action action;
 
 void blink()
 {
@@ -58,21 +67,22 @@ void setup()
   setupWiFi();
   blinker.attach(blink_ok, blink);
 
-  Service service;
-  Action action;
+  tr064.init();
+  Serial.println(tr064.friendlyName);
+  Serial.println(tr064.deviceType);
 
-  // service.serviceType = "urn:dslforum-org:service:DeviceInfo:1";
-  // service.serviceId = "urn:DeviceInfo-com:serviceId:DeviceInfo1";
-  // service.controlURL = "/upnp/control/deviceinfo";
-  // service.eventSubURL = "/upnp/control/deviceinfo";
-  // service.SCPDURL = "/deviceinfoSCPD.xml";
+  service.serviceType = "urn:dslforum-org:service:DeviceInfo:1";
+  service.serviceId = "urn:DeviceInfo-com:serviceId:DeviceInfo1";
+  service.controlURL = "/upnp/control/deviceinfo";
+  service.eventSubURL = "/upnp/control/deviceinfo";
+  service.SCPDURL = "/deviceinfoSCPD.xml";
 
-  // action.name = "GetSecurityPort";
-  // action.direction = "out";
-  // action.argumentName = "NewSecurityPort";
+  action.name = "GetSecurityPort";
+  action.direction = "out";
+  action.argumentName = "NewSecurityPort";
 
-  // Serial.print("NewSecurityPort: ");
-  // Serial.println(tr064.getInfo(service, action));
+  Serial.print("NewSecurityPort: ");
+  Serial.println(tr064.getInfo(service, action));
 
   service.serviceType = "urn:dslforum-org:service:X_VoIP:1";
   service.serviceId = "urn:X_VoIP-com:serviceId:X_VoIP1";
@@ -85,8 +95,8 @@ void setup()
   action.argumentName = "NewX_AVM-DE_PhoneNumber";
   action.variable = "01735430716";
 
-  tr064.authenticate(service, action);
-  }
+  // tr064.authenticate(service, action);
+}
 
 void loop()
 {

@@ -26,7 +26,7 @@ struct Action
     String name;
     String direction;
     String argumentName;
-    String variable = "";
+    String variable;
 };
 
 class TR064
@@ -41,16 +41,16 @@ public:
     String authenticate(Service &service, Action &action);
 
 private:
-    const char *host = "fritz.box";
-    uint16_t port = 49000;
-    const char *username = "";
-    const char *password = "";
+    const char *host;
+    uint16_t port;
+    const char *username;
+    const char *password;
     String tr64desc;
     Service service;
-    String getParameter(const String &str, const String value);
-    String getDigestAuth(String &authReq, const String &username, const String &password, const String &uri, unsigned int counter);
-    String exractParam(String &authReq, const String &param, const char delimit);
+    String getDigestAuth(const String &authReq, const String &username, const String &password, const String &uri, unsigned int counter);
+    String exractParameter(const String &str, const String &param, char delimit);
     String getCNonce(int len);
+    String composeXML(const Service &service, const Action &action);
 };
 
 #endif

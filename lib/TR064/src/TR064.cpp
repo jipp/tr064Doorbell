@@ -12,8 +12,8 @@ boolean TR064::init()
 {
     if (getPage(tr64desc, "tr64desc.xml"))
     {
-        friendlyName = getParameter(tr64desc, "friendlyName");
-        deviceType = getParameter(tr64desc, "deviceType");
+        friendlyName = exractParameter(tr64desc, "friendlyName>", '<');
+        deviceType = exractParameter(tr64desc, "deviceType>", '<');
 
         return true;
     }
@@ -45,10 +45,12 @@ boolean TR064::getPage(String &str, const String &url)
         }
         else
         {
-            Serial.printf("[HTTP] GET... failed, error: %s\n", httpClient.errorToString(httpCode).c_str());
+            Serial.println("[HTTP] GET... failed, error: " + String(httpCode));
         }
 
         httpClient.end();
+
+        yield();
     }
     else
     {
@@ -56,24 +58,6 @@ boolean TR064::getPage(String &str, const String &url)
     }
 
     return false;
-}
-
-String TR064::getParameter(const String &str, const String value)
-{
-    int16_t start;
-    int16_t stop;
-
-    start = str.indexOf("<" + value + ">");
-    stop = str.indexOf("</" + value + ">");
-
-    if (start >= 0 && stop >= 0)
-    {
-        start += value.length() + 2;
-
-        return str.substring(start, stop);
-    }
-
-    return "";
 }
 
 String TR064::getInfo(Service &service, Action &action)
@@ -89,40 +73,28 @@ String TR064::getInfo(Service &service, Action &action)
     int httpCode;
     String payload;
 
-    xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
-    xml += "<s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">\n";
-    xml += "<s:Body>\n";
-    xml += "<u:" + action.name + " xmlns:u=\"" + service.serviceType + "\">\n";
-    if (action.direction == "in")
-    {
-        xml += "<" + action.argumentName + ">" + action.variable + "</" + action.argumentName + ">\n";
-    }
-    xml += "</u:" + action.name + ">\n";
-    xml += "</s:Body>\n";
-    xml += "</s:Envelope>\n";
+    xml = composeXML(service, action);
 
     soapAction = service.serviceType + "#" + action.name;
-    url = "http://" + String(host) + ":" + 49000 + service.controlURL;
+    url = "http://" + String(host) + ":" + port + service.controlURL;
 
     httpClient.begin(wifiClient, url);
 
     httpClient.addHeader("Content-Type", "text/xml; charset=\"utf-8\"");
     httpClient.addHeader("SoapAction", soapAction);
 
-    Serial.print("SoapAction: ");
-    Serial.println(soapAction);
-    Serial.println(xml);
-
     httpCode = httpClient.POST(xml);
     payload = httpClient.getString();
     httpClient.end();
+
+    yield();
 
     switch (httpCode)
     {
     case HTTP_CODE_OK:
         if (action.direction == "out")
         {
-            return getParameter(payload, action.argumentName);
+            return exractParameter(payload, action.argumentName + '>', '<');
         }
         else
         {
@@ -134,7 +106,9 @@ String TR064::getInfo(Service &service, Action &action)
         // authenticate(service, action);
         return "";
     case HTTP_CODE_INTERNAL_SERVER_ERROR:
-        Serial.println(getParameter(payload, "errorDescription"));
+        Serial.println("500 Internal Server Error");
+        Serial.println(exractParameter(payload, "errorDescription>", '<'));
+        Serial.println(payload);
         return "";
     default:
         return "";
@@ -154,22 +128,9 @@ String TR064::authenticate(Service &service, Action &action)
     int httpCode;
     String payload;
 
-    // compose xml
-    xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
-    xml += "<s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">\n";
-    xml += "<s:Body>\n";
-    xml += "<u:" + action.name + " xmlns:u=\"" + service.serviceType + "\">\n";
-    if (action.direction == "in")
-    {
-        xml += "<" + action.argumentName + ">" + action.variable + "</" + action.argumentName + ">\n";
-    }
-    xml += "</u:" + action.name + ">\n";
-    xml += "</s:Body>\n";
-    xml += "</s:Envelope>\n";
-
-    // compose header and url
+    xml = composeXML(service, action);
     soapAction = service.serviceType + "#" + action.name;
-    url = "http://" + String(host) + ":" + 49000 + service.controlURL;
+    url = "http://" + String(host) + ":" + port + service.controlURL;
 
     httpClient.begin(wifiClient, url);
 
@@ -179,25 +140,18 @@ String TR064::authenticate(Service &service, Action &action)
     httpClient.addHeader("Content-Type", "text/xml; charset=\"utf-8\"");
     httpClient.addHeader("SoapAction", soapAction);
 
-    Serial.print("SoapAction: ");
-    Serial.println(soapAction);
-    Serial.println(xml);
-
     // send packet
     httpCode = httpClient.POST(xml);
 
     String authReq = httpClient.header("WWW-Authenticate");
-    Serial.print("WWW-Authenticate: ");
-    Serial.println(authReq);
 
     payload = httpClient.getString();
     httpClient.end();
 
+    yield();
+
     // compose 2nd packet
     String authorization = getDigestAuth(authReq, String(username), String(password), String(service.controlURL), 1);
-    Serial.print("Authorization: ");
-    Serial.println(authorization);
-
     //
 
     httpClient.begin(wifiClient, url);
@@ -206,14 +160,12 @@ String TR064::authenticate(Service &service, Action &action)
     httpClient.addHeader("Content-Type", "text/xml; charset=\"utf-8\"");
     httpClient.addHeader("SoapAction", soapAction);
 
-    Serial.print("SoapAction: ");
-    Serial.println(soapAction);
-    Serial.println(xml);
-
     httpCode = httpClient.POST(xml);
 
     payload = httpClient.getString();
     httpClient.end();
+
+    yield();
 
     //
     switch (httpCode)
@@ -221,7 +173,7 @@ String TR064::authenticate(Service &service, Action &action)
     case HTTP_CODE_OK:
         if (action.direction == "out")
         {
-            return getParameter(payload, action.argumentName);
+            return exractParameter(payload, action.argumentName + '>', '<');
         }
         else
         {
@@ -230,21 +182,22 @@ String TR064::authenticate(Service &service, Action &action)
     case HTTP_CODE_UNAUTHORIZED:
         Serial.println("401 Unauthorized");
         Serial.println(payload);
-        // authenticate(service, action);
         return "";
     case HTTP_CODE_INTERNAL_SERVER_ERROR:
-        Serial.println(getParameter(payload, "errorDescription"));
+        Serial.println("500 Internal Server Error");
+        Serial.println(exractParameter(payload, "errorDescription>", '<'));
+        Serial.println(payload);
         return "";
     default:
         return "";
     }
 }
 
-String TR064::getDigestAuth(String &authReq, const String &username, const String &password, const String &uri, unsigned int counter)
+String TR064::getDigestAuth(const String &authReq, const String &username, const String &password, const String &uri, unsigned int counter)
 {
     // extracting required parameters for RFC 2069 simpler Digest
-    String realm = exractParam(authReq, "realm=\"", '"');
-    String nonce = exractParam(authReq, "nonce=\"", '"');
+    String realm = exractParameter(authReq, "realm=\"", '"');
+    String nonce = exractParameter(authReq, "nonce=\"", '"');
     String cNonce = getCNonce(44);
 
     char nc[9];
@@ -267,21 +220,17 @@ String TR064::getDigestAuth(String &authReq, const String &username, const Strin
     md5.calculate();
     String response = md5.toString();
 
-    String authorization = "Digest username=\"" + username + "\", realm=\"" + realm + "\", nonce=\"" + nonce +
-                           "\", uri=\"" + uri + "\", cnonce=\"" + cNonce + "\", nc=" + String(nc) + ", qop=auth, response=\"" + response + "\", algorithm=\"MD5\"";
-    Serial.println(authorization);
-
-    return authorization;
+    return "Digest username=\"" + username + "\", realm=\"" + realm + "\", nonce=\"" + nonce + "\", uri=\"" + uri + "\", cnonce=\"" + cNonce + "\", nc=" + String(nc) + ", qop=auth, response=\"" + response + "\", algorithm=\"MD5\"";
 }
 
-String TR064::exractParam(String &authReq, const String &param, const char delimit)
+String TR064::exractParameter(const String &str, const String &parameter, char delimiter)
 {
-    int start = authReq.indexOf(param);
+    int start = str.indexOf(parameter);
     if (start == -1)
     {
         return "";
     }
-    return authReq.substring(start + param.length(), authReq.indexOf(delimit, start + param.length()));
+    return str.substring(start + parameter.length(), str.indexOf(delimiter, start + parameter.length()));
 }
 
 String TR064::getCNonce(const int len)
@@ -298,4 +247,23 @@ String TR064::getCNonce(const int len)
     }
 
     return s;
+}
+
+String TR064::composeXML(const Service &service, const Action &action)
+{
+    String xml;
+
+    xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+    xml += "<s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">\n";
+    xml += "<s:Body>\n";
+    xml += "<u:" + action.name + " xmlns:u=\"" + service.serviceType + "\">\n";
+    if (action.direction == "in")
+    {
+        xml += "<" + action.argumentName + ">" + action.variable + "</" + action.argumentName + ">\n";
+    }
+    xml += "</u:" + action.name + ">\n";
+    xml += "</s:Body>\n";
+    xml += "</s:Envelope>\n";
+
+    return xml;
 }
