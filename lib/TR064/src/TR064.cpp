@@ -96,10 +96,7 @@ String TR064::getInfo(Service &service, Action &action)
         {
             return exractParameter(payload, action.argumentName + '>', '<');
         }
-        else
-        {
-            return "";
-        }
+        return "";
     case HTTP_CODE_UNAUTHORIZED:
         Serial.println("401 Unauthorized");
         Serial.println(payload);

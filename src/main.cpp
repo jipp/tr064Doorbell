@@ -95,7 +95,7 @@ void setup()
   action.argumentName = "NewX_AVM-DE_PhoneNumber";
   action.variable = "01735430716";
 
-  // tr064.authenticate(service, action);
+  tr064.authenticate(service, action);
 }
 
 void loop()

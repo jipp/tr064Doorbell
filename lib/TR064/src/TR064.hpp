@@ -32,8 +32,8 @@ struct Action
 class TR064
 {
 public:
-    String friendlyName;
-    String deviceType;
+    String friendlyName = "";
+    String deviceType = "";
     TR064(const char *host, uint16_t port, const char *username, const char *password);
     boolean init();
     boolean getPage(String &str, const String &url);
@@ -45,7 +45,7 @@ private:
     uint16_t port;
     const char *username;
     const char *password;
-    String tr64desc;
+    String tr64desc = "";
     Service service;
     String getDigestAuth(const String &authReq, const String &username, const String &password, const String &uri, unsigned int counter);
     String exractParameter(const String &str, const String &param, char delimit);
