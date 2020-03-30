@@ -48,7 +48,11 @@ void blink()
 
 void showStatus()
 {
+#if defined(ESP8266)
+  Serial.println(">>" + String(millis()) + "ms FreeHeap: " + ESP.getFreeHeap() + "b");
+#elif defined(ESP32)
   Serial.println(">>" + String(millis()) + "ms FreeHeap: " + ESP.getFreeHeap() + "b FreePsram: " + ESP.getFreePsram() + "b");
+#endif
 }
 
 void setupWiFi()
@@ -126,6 +130,8 @@ void setup()
   Serial.begin(SPEED);
 
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(PUSH_BUTTON, INPUT_PULLUP);
+  pinMode(SENSOR, INPUT);
 
   blinker.attach(blink_nok, blink);
   setupWiFi();
