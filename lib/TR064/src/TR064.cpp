@@ -8,126 +8,18 @@ TR064::TR064(const char *host, uint16_t port, const char *username, const char *
     this->password = password;
 }
 
-boolean TR064::init()
-{
-    if (getPage(tr64desc, "tr64desc.xml"))
-    {
-        friendlyName = exractParameter(tr64desc, "friendlyName>", '<');
-        deviceType = exractParameter(tr64desc, "deviceType>", '<');
-
-        return true;
-    }
-
-    return false;
-}
-
-boolean TR064::getPage(String &str, const String &url)
-{
-    HTTPClient httpClient;
-    WiFiClient wifiClient;
-    String link;
-    int httpCode;
-
-    link = "http://" + String(host) + ":" + port + "/" + url;
-
-    if (httpClient.begin(wifiClient, link.c_str()))
-    {
-        httpCode = httpClient.GET();
-
-        if (httpCode > 0)
-        {
-            if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
-            {
-                str = httpClient.getString();
-
-                return true;
-            }
-        }
-        else
-        {
-            Serial.println("[HTTP] GET... failed, error: " + String(httpCode));
-        }
-
-        httpClient.end();
-
-        yield();
-    }
-    else
-    {
-        Serial.printf("[HTTP} Unable to connect\n");
-    }
-
-    return false;
-}
-
-String TR064::getInfo(Service &service, Action &action)
+String TR064::trigger(Service &service, Action &action)
 {
     // http://fritz.box:49000/tr64desc.xml
 
-    HTTPClient httpClient;
-    WiFiClient wifiClient;
+    String authorization = "";
+    String result = "";
 
-    String xml;
-    String url;
-    String soapAction;
-    int httpCode;
-    String payload;
+    String url = "http://" + String(host) + ":" + port + service.controlURL;
+    String soapAction = service.serviceType + "#" + action.name;
+    String xml = composeXML(service, action);
 
-    xml = composeXML(service, action);
-
-    soapAction = service.serviceType + "#" + action.name;
-    url = "http://" + String(host) + ":" + port + service.controlURL;
-
-    httpClient.begin(wifiClient, url);
-
-    httpClient.addHeader("Content-Type", "text/xml; charset=\"utf-8\"");
-    httpClient.addHeader("SoapAction", soapAction);
-
-    httpCode = httpClient.POST(xml);
-    payload = httpClient.getString();
-    httpClient.end();
-
-    yield();
-
-    switch (httpCode)
-    {
-    case HTTP_CODE_OK:
-        if (action.direction == "out")
-        {
-            return exractParameter(payload, action.argumentName + '>', '<');
-        }
-        return "";
-    case HTTP_CODE_UNAUTHORIZED:
-        Serial.println("401 Unauthorized");
-        Serial.println(payload);
-        // authenticate(service, action);
-        return "";
-    case HTTP_CODE_INTERNAL_SERVER_ERROR:
-        Serial.println("500 Internal Server Error");
-        Serial.println(exractParameter(payload, "errorDescription>", '<'));
-        Serial.println(payload);
-        return "";
-    default:
-        return "";
-    }
-}
-
-String TR064::authenticate(Service &service, Action &action)
-{
-    // http://fritz.box:49000/tr64desc.xml
-
-    HTTPClient httpClient;
-    WiFiClient wifiClient;
-
-    String xml;
-    String url;
-    String soapAction;
-    int httpCode;
-    String payload;
-
-    xml = composeXML(service, action);
-    soapAction = service.serviceType + "#" + action.name;
-    url = "http://" + String(host) + ":" + port + service.controlURL;
+    ////////
 
     httpClient.begin(wifiClient, url);
 
@@ -138,56 +30,53 @@ String TR064::authenticate(Service &service, Action &action)
     httpClient.addHeader("SoapAction", soapAction);
 
     // send packet
-    httpCode = httpClient.POST(xml);
+    int httpCode = httpClient.POST(xml);
 
     String authReq = httpClient.header("WWW-Authenticate");
+    String payload = httpClient.getString();
 
-    payload = httpClient.getString();
     httpClient.end();
 
-    yield();
+    if (!analyzePayload(payload, httpCode, action, result))
+    {
+        return "";
+    }
+    ////////
 
     // compose 2nd packet
-    String authorization = getDigestAuth(authReq, String(username), String(password), String(service.controlURL), 1);
-    //
+
+    if (sendPacket(url, xml, soapAction, authReq, action, service, result))
+    {
+        return result;
+    }
+
+    return "";
+}
+
+bool TR064::sendPacket(String &url, String &xml, String &soapAction, String &authReq, Action &action, Service &service, String &result)
+{
+    String authorization = "";
+
+    if (authReq != "")
+    {
+        authorization = getDigestAuth(authReq, String(username), String(password), String(service.controlURL), 1);
+    }
 
     httpClient.begin(wifiClient, url);
-
-    httpClient.addHeader("Authorization", authorization);
+    if (authReq != "")
+    {
+        httpClient.addHeader("Authorization", authorization);
+    }
     httpClient.addHeader("Content-Type", "text/xml; charset=\"utf-8\"");
     httpClient.addHeader("SoapAction", soapAction);
 
-    httpCode = httpClient.POST(xml);
+    int httpCode = httpClient.POST(xml);
 
-    payload = httpClient.getString();
+    String payload = httpClient.getString();
+
     httpClient.end();
 
-    yield();
-
-    //
-    switch (httpCode)
-    {
-    case HTTP_CODE_OK:
-        if (action.direction == "out")
-        {
-            return exractParameter(payload, action.argumentName + '>', '<');
-        }
-        else
-        {
-            return "";
-        }
-    case HTTP_CODE_UNAUTHORIZED:
-        Serial.println("401 Unauthorized");
-        Serial.println(payload);
-        return "";
-    case HTTP_CODE_INTERNAL_SERVER_ERROR:
-        Serial.println("500 Internal Server Error");
-        Serial.println(exractParameter(payload, "errorDescription>", '<'));
-        Serial.println(payload);
-        return "";
-    default:
-        return "";
-    }
+    return analyzePayload(payload, httpCode, action, result);
 }
 
 String TR064::getDigestAuth(const String &authReq, const String &username, const String &password, const String &uri, unsigned int counter)
@@ -196,8 +85,8 @@ String TR064::getDigestAuth(const String &authReq, const String &username, const
     String realm = exractParameter(authReq, "realm=\"", '"');
     String nonce = exractParameter(authReq, "nonce=\"", '"');
     String cNonce = getCNonce(44);
-
     char nc[9];
+
     snprintf(nc, sizeof(nc), "%08x", counter);
 
     // parameters for the RFC 2617 newer Digest
@@ -223,10 +112,12 @@ String TR064::getDigestAuth(const String &authReq, const String &username, const
 String TR064::exractParameter(const String &str, const String &parameter, char delimiter)
 {
     int start = str.indexOf(parameter);
+
     if (start == -1)
     {
         return "";
     }
+
     return str.substring(start + parameter.length(), str.indexOf(delimiter, start + parameter.length()));
 }
 
@@ -248,9 +139,7 @@ String TR064::getCNonce(const int len)
 
 String TR064::composeXML(const Service &service, const Action &action)
 {
-    String xml;
-
-    xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+    String xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
     xml += "<s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">\n";
     xml += "<s:Body>\n";
     xml += "<u:" + action.name + " xmlns:u=\"" + service.serviceType + "\">\n";
@@ -263,4 +152,30 @@ String TR064::composeXML(const Service &service, const Action &action)
     xml += "</s:Envelope>\n";
 
     return xml;
+}
+
+bool TR064::analyzePayload(String &payload, int httpCode, Action &action, String &result)
+{
+    switch (httpCode)
+    {
+    case HTTP_CODE_OK:
+        if (action.direction == "out")
+        {
+            result = exractParameter(payload, action.argumentName + '>', '<');
+            return true;
+        }
+        return false;
+    case HTTP_CODE_UNAUTHORIZED:
+        Serial.println("401 Unauthorized");
+        Serial.println(payload);
+        return false;
+    case HTTP_CODE_INTERNAL_SERVER_ERROR:
+        Serial.println("500 Internal Server Error");
+        result = exractParameter(payload, "errorDescription>", '<');
+        Serial.println(result);
+        Serial.println(payload);
+        return false;
+    default:
+        return false;
+    }
 }

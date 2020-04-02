@@ -18,21 +18,27 @@
 #define SPEED 115200
 #endif
 
-const char *hostname = "doorbell";
 const char *host = "fritz.box";
 const uint16_t port = 49000;
+const char *hostname = "doorbell";
 const char *username = "doorbell";
 const char *password = "Drei3Zehn";
 const char *phoneNumber = "**612";
-Ticker blinker;
-Ticker memory;
-Ticker terminate;
+Ticker toBlink;
+Ticker toShowStatus;
+Ticker toHangupCall;
+Ticker trial;
 const float blink_ok = 0.5;
 const float blink_nok = 0.1;
 const uint32_t pulse = 60000;
-const uint32_t duration = 3000;
+const uint32_t callDuration = 3000;
 
+#if defined(ESP8266)
+#define PUSH_BUTTON D1
+#elif defined(ESP32)
 #define PUSH_BUTTON 27
+#endif
+
 #define SENSOR A0
 
 TR064 tr064(host, port, username, password);
@@ -76,7 +82,7 @@ void setupWiFi()
   }
 }
 
-void securityPort()
+void getSecurityPort()
 {
   service.serviceType = "urn:dslforum-org:service:DeviceInfo:1";
   service.serviceId = "urn:DeviceInfo-com:serviceId:DeviceInfo1";
@@ -89,10 +95,10 @@ void securityPort()
   action.argumentName = "NewSecurityPort";
 
   Serial.print("NewSecurityPort: ");
-  Serial.println(tr064.getInfo(service, action));
+  Serial.println(tr064.trigger(service, action));
 }
 
-void hangup()
+void hangupCall()
 {
   service.serviceType = "urn:dslforum-org:service:X_VoIP:1";
   service.serviceId = "urn:X_VoIP-com:serviceId:X_VoIP1";
@@ -104,7 +110,7 @@ void hangup()
   action.direction = "out";
   action.argumentName = "";
 
-  tr064.authenticate(service, action);
+  tr064.trigger(service, action);
 }
 
 void dial()
@@ -120,9 +126,9 @@ void dial()
   action.argumentName = "NewX_AVM-DE_PhoneNumber";
   action.variable = phoneNumber;
 
-  tr064.authenticate(service, action);
+  tr064.trigger(service, action);
 
-  terminate.once_ms(duration, hangup);
+  toHangupCall.once_ms(callDuration, hangupCall);
 }
 
 void setup()
@@ -133,12 +139,15 @@ void setup()
   pinMode(PUSH_BUTTON, INPUT_PULLUP);
   pinMode(SENSOR, INPUT);
 
-  blinker.attach(blink_nok, blink);
+  toBlink.attach(blink_nok, blink);
   setupWiFi();
-  blinker.attach(blink_ok, blink);
-  memory.attach_ms(pulse, showStatus);
+  toBlink.attach(blink_ok, blink);
+  toShowStatus.attach_ms(pulse, showStatus);
 
   button.attachClick(dial);
+
+  getSecurityPort();
+  trial.attach_ms(10000, getSecurityPort);
 }
 
 void loop()
