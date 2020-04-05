@@ -12,6 +12,7 @@ String TR064::trigger(Service &service, Action &action)
 {
     // http://fritz.box:49000/tr64desc.xml
 
+    String authReq = "";
     String authorization = "";
     String result = "";
 
@@ -19,8 +20,22 @@ String TR064::trigger(Service &service, Action &action)
     String soapAction = service.serviceType + "#" + action.name;
     String xml = composeXML(service, action);
 
-    ////////
+    // compose 1st packet
 
+    Serial.println(requestAutehntication(url, xml, soapAction, authReq, action, service, result));
+
+    // compose 2nd packet
+
+    if (sendPacket(url, xml, soapAction, authReq, action, service, result))
+    {
+        return result;
+    }
+
+    return "";
+}
+
+bool TR064::requestAutehntication(String &url, String &xml, String &soapAction, String &authReq, Action &action, Service &service, String &result)
+{
     httpClient.begin(wifiClient, url);
 
     const char *keys[] = {"WWW-Authenticate"};
@@ -32,25 +47,14 @@ String TR064::trigger(Service &service, Action &action)
     // send packet
     int httpCode = httpClient.POST(xml);
 
-    String authReq = httpClient.header("WWW-Authenticate");
+    authReq = httpClient.header("WWW-Authenticate");
     String payload = httpClient.getString();
 
     httpClient.end();
 
-    if (!analyzePayload(payload, httpCode, action, result))
-    {
-        return "";
-    }
-    ////////
+    Serial.println(authReq);
 
-    // compose 2nd packet
-
-    if (sendPacket(url, xml, soapAction, authReq, action, service, result))
-    {
-        return result;
-    }
-
-    return "";
+    return analyzePayload(payload, httpCode, action, result);
 }
 
 bool TR064::sendPacket(String &url, String &xml, String &soapAction, String &authReq, Action &action, Service &service, String &result)
@@ -176,6 +180,7 @@ bool TR064::analyzePayload(String &payload, int httpCode, Action &action, String
         Serial.println(payload);
         return false;
     default:
+        Serial.println("not catched");
         return false;
     }
 }

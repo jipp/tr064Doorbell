@@ -45,6 +45,7 @@ private:
     const char *username;
     const char *password;
     String tr64desc = "";
+    bool requestAutehntication(String &url, String &xml, String &soapAction, String &authReq, Action &action, Service &service, String &result);
     bool sendPacket(String &url, String &xml, String &soapAction, String &authReq, Action &action, Service &service, String &result);
     String getDigestAuth(const String &authReq, const String &username, const String &password, const String &uri, unsigned int counter);
     String exractParameter(const String &str, const String &param, char delimit);
